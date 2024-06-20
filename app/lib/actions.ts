@@ -1,6 +1,5 @@
 'use server';
 import { sql } from "@vercel/postgres";
-import { ifError } from "assert";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -42,9 +41,10 @@ export const createInvoice = async (prevState: State, formData: FormData)=>{
   if (!validatedFields.success) {
     return {
       errors: validatedFields.error.flatten().fieldErrors,
-      message: 'Missing Fields. Failedto create invoice.',
+      message: 'Missing Fields. Failed to create invoice.',
     };
   }
+
 
   const { customerId, amount, status} = validatedFields.data;
   const amountInCents = amount * 100;
@@ -53,7 +53,7 @@ export const createInvoice = async (prevState: State, formData: FormData)=>{
   try {
     await sql`
       INSERT INTO invoices (customer_id, amount, status, date)
-      VALUES (${customerId}, ${amountInCents}, ${amount}, ${date})
+      VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
     `;
   
   } catch (error) {
