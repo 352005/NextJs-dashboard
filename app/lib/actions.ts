@@ -3,6 +3,8 @@ import { sql } from "@vercel/postgres";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { signIn } from "@/auth";
+import { AuthError } from "next-auth";
 
 const FormSchema = z.object({
   id: z.string(),
@@ -66,14 +68,46 @@ export const createInvoice = async (prevState: State, formData: FormData)=>{
   redirect('/dashboard/invoices');
 }
 
-const UpdateInvoice = FormSchema.omit({id: true, date: true});
+const FormSchema2 = z.object({
+  id: z.string(),
+  customerId: z.string({
+    invalid_type_error: 'Please select a customer.',
+  }),
+  amount: z.coerce.number()
+  .gt(0, {message: 'Please enter an amount greater than $0.'}),
+  status: z.enum(['paid','pending'], {
+    invalid_type_error: 'Please select an invoice status.'
+  }),
+  date: z.string(),
+});
 
-export const updateInvoice = async (id: string, formData: FormData)=>{
-  const { customerId, amount, status } = UpdateInvoice.parse({
+const UpdateInvoice = FormSchema2.omit({id: true, date: true});
+
+export type UpdateState = {
+  id?: string;
+  errors?: {
+    customerId?: string[];
+    amount?: string[];
+    status?: string[];
+  };
+  message?: string | null;
+}
+
+export const updateInvoice = async ( id: string, prevState: UpdateState, formData: FormData)=>{
+  const updateValidatedFields = UpdateInvoice.safeParse({
     customerId: formData.get('customerId'),
     amount: formData.get('amount'),
     status: formData.get('status'),
   });
+
+  if (!updateValidatedFields.success) {
+    return {
+      errors: updateValidatedFields.error.flatten().fieldErrors,
+      message: 'Missing Fields. Failed to create invoice.',
+    };
+  }
+
+  const { customerId, amount, status} = updateValidatedFields.data;
 
   const amountInCents = amount * 100;
 
@@ -108,5 +142,24 @@ export const deleteInvoice = async (id: string)=>{
     return {
       message: 'Database Error: Failed to delete invoice',
     }
+  }
+}
+
+export async function authenticate(
+  prevState: string | undefined,
+  formData: FormData,
+) {
+  try {
+    await signIn('credentials', formData);
+  } catch (error) {
+    if (error instanceof AuthError) {
+      switch (error.type) {
+        case 'CredentialsSignin':
+          return 'Invalid credentials.';
+        default:
+          return 'Something went wrong.';
+      }
+    }
+    throw error;
   }
 }
