@@ -10,14 +10,31 @@ import { ArrowRightIcon } from '@heroicons/react/20/solid';
 import { Button } from './button';
 import { useFormState } from 'react-dom';
 import { authenticate } from '../lib/actions';
+import { signIn } from 'next-auth/react';
 
 export default function LoginForm() {
   const [errorMessage, formAction] = useFormState(
     authenticate,
     undefined,
   )
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    const result = await formAction(event.currentTarget);
+    if (result.error) {
+      return;
+    }
+
+    // Redirect after successful login using signIn
+    await signIn('credentials', {
+      redirect: false, // Prevent default redirection
+    });
+
+    // Redirect to the desired page after successful login
+    router.push('/dashboard'); // Replace with your target route
+  };
   return (
-    <form action={formAction} className="space-y-3">
+    <form action={handleSubmit} className="space-y-3">
       <div className="flex-1 rounded-lg bg-gray-50 px-6 pb-4 pt-8">
         <h1 className={`${lusitana.className} mb-3 text-2xl`}>
           Please log in to continue.
